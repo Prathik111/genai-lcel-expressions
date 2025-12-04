@@ -35,60 +35,82 @@ Test the LCEL expression using multiple input values for topic and length.
 Name:Prathik TS
 Reg.No:21222224240117
 ```
-```
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain_google_genai import ChatGoogleGenerativeAI
-from google.colab import userdata
-from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+```py
+# ================================
+# INSTALLS:
+# pip install -U langchain-core langchain-groq pydantic python-dotenv
+# ================================
 
-# Step 1: Define Parameters and Prompt Template
-prompt_template = PromptTemplate(
-    input_variables=["topic", "length"],
-    template=(
-        "You are a helpful assistant. Please provide the following in valid JSON format:\n"
-        "- A concise summary of {topic}.\n"
-        "- The word count of the summary.\n\n"
-        "Response should look like this:\n"
-        "{{\n"
-        '  "summary": "Your concise summary here.",\n'
-        '  "word_count": 123\n'
-        "}}\n\n"
-        "Write a {length}-word summary about {topic}. Be concise and factual."
-    )
+from pydantic import BaseModel, Field
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_groq import ChatGroq
+import os
+
+# Set your Groq API key
+os.environ["GROQ_API_KEY"] = "groq_api"
+
+# ================================
+# 1. STRUCTURED MODEL
+# ================================
+class SummaryResponse(BaseModel):
+    summary: str
+    word_count: int
+    highlights: list[str]
+
+parser = PydanticOutputParser(pydantic_object=SummaryResponse)
+
+# ESCAPE THE FORMAT INSTRUCTIONS
+format_rules = parser.get_format_instructions().replace("{", "{{").replace("}", "}}")
+
+# ================================
+# 2. PROMPT
+# ================================
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are a concise factual summarizer."),
+        ("human",
+         "Write a {length}-word {tone} summary about: {topic}.\n"
+         "Provide exactly 3 short highlights.\n\n"
+         "Output MUST be valid JSON using this schema:\n"
+         f"{format_rules}\n\n"
+         "Audience: {audience}"
+        ),
+    ]
 )
-```
-```
-# Step 2: Define the Output Parser
-response_schemas = [
-    ResponseSchema(name="summary", description="A concise summary of the topic."),
-    ResponseSchema(name="word_count", description="The number of words in the summary."),
-]
-output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
 
-# Step 3: Create the LangChain LLM Chain with Gemini Model
-API_KEY = userdata.get('GEMINI_API_KEY') 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-pro", 
-    temperature=0.3, 
-    google_api_key=API_KEY
+# ================================
+# 3. MODEL (GROQ)
+# ================================
+llm = ChatGroq(
+    model="openai/gpt-oss-20b",
+    temperature=0
 )
 
-chain = LLMChain(prompt=prompt_template, llm=llm, output_parser=output_parser)
+# ================================
+# 4. LCEL CHAIN
+# ================================
+chain = prompt | llm | parser
 
-# Step 4: Execute the Chain with Examples
+# ================================
+# 5. TEST EXAMPLES
+# ================================
 examples = [
-    {"topic": "Climate Change", "length": "50"},
-    {"topic": "Artificial Intelligence", "length": "30"},
+    {"topic": "Climate change causes", "length": "50", "tone": "neutral", "audience": "general readers"},
+    {"topic": "Transformer neural networks", "length": "40", "tone": "technical", "audience": "ML engineers"},
 ]
 
-for example in examples:
-    try:
-        result = chain.run(example)
-        print(f"Input: {example}")
-        print(f"Output: {result}\n")
-    except Exception as e:
-        print(f"Error for input {example}: {e}\n")
+for ex in examples:
+    print("\n=== INPUT ===")
+    print(ex)
+
+    result = chain.invoke(ex)
+    print("\n=== PARSED JSON OUTPUT ===")
+    print(result.model_dump())
+
+    real_wc = len(result.summary.split())
+    print("Reported:", result.word_count)
+    print("Actual:", real_wc)
 
 ```
 ### OUTPUT:
