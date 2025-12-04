@@ -114,7 +114,7 @@ for ex in examples:
 
 ```
 ### OUTPUT:
-<img width="1869" height="187" alt="390028985-05163bf9-5013-473f-8a64-21a68b1712b3" src="https://github.com/user-attachments/assets/d8bcd928-8595-406a-93b4-43d806b49d6a" />
+<img width="1694" height="538" alt="image" src="https://github.com/user-attachments/assets/fd4f979d-c81b-4a7d-b8bd-eff91caf5690" />
 
 ### RESULT:
   Thus, the LangChain Expression Language (LCEL) expression that utilizes two prompt parameters and three key components (prompt, model, and output parser) was designed and implemented successfully. And also evaluated its functionality by analyzing relevant examples of its application in real-world scenarios.
